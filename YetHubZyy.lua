@@ -1,128 +1,191 @@
---[[
-  The Strongest Battlegrounds ULTIMATE v5.1
-  - Fixed all errors
-  - Mobile & PC Support
-  - Simple and reliable
-]]
+-- Dead Rails Mobile Script
+-- Works on most executors
 
-if not game:IsLoaded() then game.Loaded:Wait() end
+-- Load required libraries
+if not is_sirhurt_closure and syn and syn.protect_gui then
+    syn.protect_gui(game:GetService("CoreGui"))
+end
 
--- Services
+-- Main variables
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-
--- Player Setup
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- UI Setup
+-- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.Name = "TSB_Ultimate_v5"
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 300, 0, 400)
-MainFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-MainFrame.Active = true
-MainFrame.Draggable = true
-
+local Frame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
-Title.Parent = MainFrame
-Title.Text = "TSB ULTIMATE v5.1"
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-Title.TextColor3 = Color3.new(1, 1, 1)
+local AutoFarm = Instance.new("TextButton")
+local AutoCollect = Instance.new("TextButton")
+local TeleportToTrack = Instance.new("TextButton")
+local SpeedHack = Instance.new("TextButton")
+local Close = Instance.new("TextButton")
 
--- Features
-local features = {
-    GodMode = false,
-    InfiniteStamina = false,
-    AutoParry = false,
-    HitboxExtender = false,
-    SpeedHack = false,
-    NoCooldown = false,
-    AutoFarm = false
-}
+ScreenGui.Name = "DeadRailsMobileGUI"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Fixed Toggle Function
-local function CreateToggle(parent, name, yPos)
+Frame.Parent = ScreenGui
+Frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Frame.BorderColor3 = Color3.fromRGB(25, 25, 25)
+Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
+Frame.Size = UDim2.new(0.8, 0, 0.8, 0)
+Frame.Active = true
+Frame.Draggable = true
+
+Title.Name = "Title"
+Title.Parent = Frame
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Size = UDim2.new(1, 0, 0.1, 0)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "Dead Rails Mobile"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextScaled = true
+
+-- Button setup function
+local function createButton(name, text, position)
     local button = Instance.new("TextButton")
-    button.Parent = parent
-    button.Text = name .. ": OFF"
-    button.Size = UDim2.new(0.9, 0, 0, 30)
-    button.Position = UDim2.new(0.05, 0, yPos, 0)
-    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    button.TextColor3 = Color3.new(1, 1, 1)
-    
-    -- Using MouseButton1Down instead of MouseButton1Click
-    button.MouseButton1Down = function()
-        features[name] = not features[name]
-        button.Text = name .. ": " .. (features[name] and "ON" or "OFF")
-    end
-    
+    button.Name = name
+    button.Parent = Frame
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    button.BorderColor3 = Color3.fromRGB(40, 40, 40)
+    button.Position = position
+    button.Size = UDim2.new(0.9, 0, 0.15, 0)
+    button.Font = Enum.Font.SourceSans
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextScaled = true
     return button
 end
 
--- Create Toggles
-local yPositions = {
-    GodMode = 0.1,
-    InfiniteStamina = 0.2,
-    AutoParry = 0.3,
-    HitboxExtender = 0.4,
-    SpeedHack = 0.5,
-    NoCooldown = 0.6,
-    AutoFarm = 0.7
-}
+-- Create buttons
+AutoFarm = createButton("AutoFarm", "Auto Farm (Toggle)", UDim2.new(0.05, 0, 0.15, 0))
+AutoCollect = createButton("AutoCollect", "Auto Collect (Toggle)", UDim2.new(0.05, 0, 0.35, 0))
+TeleportToTrack = createButton("TeleportToTrack", "Teleport to Track", UDim2.new(0.05, 0, 0.55, 0))
+SpeedHack = createButton("SpeedHack", "Speed Hack (Toggle)", UDim2.new(0.05, 0, 0.75, 0))
+Close = createButton("Close", "Close GUI", UDim2.new(0.05, 0, 0.9, 0))
 
-for feature, yPos in pairs(yPositions) do
-    CreateToggle(MainFrame, feature, yPos)
-end
+-- Variables for toggles
+local farming = false
+local collecting = false
+local speedHack = false
+local originalWalkSpeed = Humanoid.WalkSpeed
 
--- Main Loop
-RunService.Heartbeat:Connect(function()
-    -- God Mode
-    if features.GodMode then
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-        Humanoid.Health = Humanoid.MaxHealth
-    end
+-- Auto Farm function
+local function toggleAutoFarm()
+    farming = not farming
+    AutoFarm.Text = farming and "Auto Farm (ON)" or "Auto Farm (OFF)"
     
-    -- Infinite Stamina
-    if features.InfiniteStamina and Character:FindFirstChild("Stamina") then
-        Character.Stamina.Value = 100
-    end
-    
-    -- Hitbox Extender
-    if features.HitboxExtender then
-        for _, part in pairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Size = Vector3.new(2, 2, 2)
+    while farming do
+        -- Find nearest enemy and attack
+        local closestEnemy = nil
+        local closestDistance = math.huge
+        
+        for _, enemy in ipairs(workspace:GetChildren()) do
+            if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
+                local distance = (HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestEnemy = enemy
+                end
             end
         end
+        
+        if closestEnemy and closestDistance < 50 then
+            HumanoidRootPart.CFrame = closestEnemy.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+            wait(0.5)
+        else
+            wait(1)
+        end
+        
+        if not farming then break end
     end
-end)
-
--- Auto Parry
-UserInputService.InputBegan:Connect(function(input)
-    if features.AutoParry and input.KeyCode == Enum.KeyCode.F then
-        -- Auto-Parry logic here
-    end
-end)
-
--- Speed Hack
-if features.SpeedHack then
-    Humanoid.WalkSpeed = 50
 end
 
--- Keybind (RightShift to Hide/Show)
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        MainFrame.Visible = not MainFrame.Visible
+-- Auto Collect function
+local function toggleAutoCollect()
+    collecting = not collecting
+    AutoCollect.Text = collecting and "Auto Collect (ON)" or "Auto Collect (OFF)"
+    
+    while collecting do
+        -- Collect nearby items
+        for _, item in ipairs(workspace:GetChildren()) do
+            if item:IsA("BasePart") and item.Name:lower():find("coin") or item.Name:lower():find("cash") then
+                if (HumanoidRootPart.Position - item.Position).magnitude < 50 then
+                    firetouchinterest(HumanoidRootPart, item, 0) -- Touch start
+                    firetouchinterest(HumanoidRootPart, item, 1) -- Touch end
+                end
+            end
+        end
+        wait(0.5)
+        if not collecting then break end
     end
+end
+
+-- Teleport to Track function
+local function teleportToTrack()
+    local track = workspace:FindFirstChild("Track") or workspace:FindFirstChild("Rail") or workspace:FindFirstChild("TrainTrack")
+    if track then
+        HumanoidRootPart.CFrame = track:FindFirstChildWhichIsA("BasePart").CFrame * CFrame.new(0, 3, 0)
+    else
+        LocalPlayer:SetAttribute("LastPosition", HumanoidRootPart.Position)
+        -- Try to find track by teleporting around
+        for x = -500, 500, 100 do
+            for z = -500, 500, 100 do
+                HumanoidRootPart.CFrame = CFrame.new(x, 100, z)
+                wait(0.1)
+                if workspace:FindFirstChild("Track") then
+                    teleportToTrack()
+                    return
+                end
+            end
+        end
+        -- If not found, return to original position
+        if LocalPlayer:GetAttribute("LastPosition") then
+            HumanoidRootPart.CFrame = CFrame.new(LocalPlayer:GetAttribute("LastPosition"))
+        end
+    end
+end
+
+-- Speed Hack function
+local function toggleSpeedHack()
+    speedHack = not speedHack
+    SpeedHack.Text = speedHack and "Speed Hack (ON)" or "Speed Hack (OFF)"
+    
+    if speedHack then
+        originalWalkSpeed = Humanoid.WalkSpeed
+        Humanoid.WalkSpeed = 50
+    else
+        Humanoid.WalkSpeed = originalWalkSpeed
+    end
+end
+
+-- Button connections
+AutoFarm.MouseButton1Click:Connect(toggleAutoFarm)
+AutoCollect.MouseButton1Click:Connect(toggleAutoCollect)
+TeleportToTrack.MouseButton1Click:Connect(teleportToTrack)
+SpeedHack.MouseButton1Click:Connect(toggleSpeedHack)
+Close.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
 end)
 
-print("TSB Ultimate v5.1 LOADED | All features working")
+-- Mobile optimization
+if game:GetService("UserInputService").TouchEnabled then
+    Frame.Size = UDim2.new(0.9, 0, 0.9, 0)
+    Frame.Position = UDim2.new(0.05, 0, 0.05, 0)
+    
+    for _, button in ipairs(Frame:GetChildren()) do
+        if button:IsA("TextButton") then
+            button.TextSize = 18
+        end
+    end
+end
+
+-- Notification
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Dead Rails Mobile",
+    Text = "Script loaded successfully!",
+    Duration = 5
+})
