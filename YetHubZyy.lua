@@ -1,191 +1,204 @@
--- Dead Rails Mobile Script
--- Works on most executors
+--[[
+    Blue Lock Auto Goal GUI
+    Features:
+    - Auto Goal Functionality
+    - Basic Anti-Kick measures
+    - Anti-Ban obfuscation
+    - Mobile compatible
+    - On/Off toggle
+    - Works with most executors
+]]
 
--- Load required libraries
-if not is_sirhurt_closure and syn and syn.protect_gui then
-    syn.protect_gui(game:GetService("CoreGui"))
+local Player = game:GetService("Players").LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Anti-detection measures
+local function SafeCall(func)
+    local success, err = pcall(func)
+    if not success then
+        warn("SafeCall error: " .. tostring(err))
+        return nil
+    end
+    return true
 end
 
--- Main variables
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+-- Randomize variable names to avoid detection
+local _ObfuscatedVars = {
+    MainModule = "BlueLock"..tostring(math.random(1000,9999)),
+    ToggleKey = Enum.KeyCode[{"F","G","H","J","K","L"}[math.random(1,6)]],
+    LastUpdate = 0,
+    Cooldown = math.random(5, 15)
+}
 
--- GUI Setup
+-- Create GUI
 local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = _ObfuscatedVars.MainModule
+ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
+
 local Frame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local AutoFarm = Instance.new("TextButton")
-local AutoCollect = Instance.new("TextButton")
-local TeleportToTrack = Instance.new("TextButton")
-local SpeedHack = Instance.new("TextButton")
-local Close = Instance.new("TextButton")
-
-ScreenGui.Name = "DeadRailsMobileGUI"
-ScreenGui.Parent = game.CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Frame.BorderColor3 = Color3.fromRGB(25, 25, 25)
-Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
-Frame.Size = UDim2.new(0.8, 0, 0.8, 0)
+Frame.Size = UDim2.new(0, 200, 0, 150)
+Frame.Position = UDim2.new(0.5, -100, 0.5, -75)
+Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Frame.BorderSizePixel = 0
 Frame.Active = true
 Frame.Draggable = true
+Frame.Parent = ScreenGui
 
-Title.Name = "Title"
+local Title = Instance.new("TextLabel")
+Title.Text = "Blue Lock Auto Goal"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
 Title.Parent = Frame
-Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Size = UDim2.new(1, 0, 0.1, 0)
-Title.Font = Enum.Font.SourceSansBold
-Title.Text = "Dead Rails Mobile"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextScaled = true
 
--- Button setup function
-local function createButton(name, text, position)
-    local button = Instance.new("TextButton")
-    button.Name = name
-    button.Parent = Frame
-    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    button.BorderColor3 = Color3.fromRGB(40, 40, 40)
-    button.Position = position
-    button.Size = UDim2.new(0.9, 0, 0.15, 0)
-    button.Font = Enum.Font.SourceSans
-    button.Text = text
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextScaled = true
-    return button
-end
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Text = "OFF"
+ToggleButton.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleButton.Position = UDim2.new(0.1, 0, 0.3, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.Font = Enum.Font.Gotham
+ToggleButton.Parent = Frame
 
--- Create buttons
-AutoFarm = createButton("AutoFarm", "Auto Farm (Toggle)", UDim2.new(0.05, 0, 0.15, 0))
-AutoCollect = createButton("AutoCollect", "Auto Collect (Toggle)", UDim2.new(0.05, 0, 0.35, 0))
-TeleportToTrack = createButton("TeleportToTrack", "Teleport to Track", UDim2.new(0.05, 0, 0.55, 0))
-SpeedHack = createButton("SpeedHack", "Speed Hack (Toggle)", UDim2.new(0.05, 0, 0.75, 0))
-Close = createButton("Close", "Close GUI", UDim2.new(0.05, 0, 0.9, 0))
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Text = "Status: Inactive"
+StatusLabel.Size = UDim2.new(0.8, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0.1, 0, 0.7, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.TextColor3 = Color3.new(1, 1, 1)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Parent = Frame
 
--- Variables for toggles
-local farming = false
-local collecting = false
-local speedHack = false
-local originalWalkSpeed = Humanoid.WalkSpeed
-
--- Auto Farm function
-local function toggleAutoFarm()
-    farming = not farming
-    AutoFarm.Text = farming and "Auto Farm (ON)" or "Auto Farm (OFF)"
-    
-    while farming do
-        -- Find nearest enemy and attack
-        local closestEnemy = nil
-        local closestDistance = math.huge
-        
-        for _, enemy in ipairs(workspace:GetChildren()) do
-            if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
-                local distance = (HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).magnitude
-                if distance < closestDistance then
-                    closestDistance = distance
-                    closestEnemy = enemy
-                end
-            end
+-- Auto Goal Logic
+local function FindSoccerBall()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower():find("ball") then
+            return obj
         end
-        
-        if closestEnemy and closestDistance < 50 then
-            HumanoidRootPart.CFrame = closestEnemy.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
-            wait(0.5)
-        else
-            wait(1)
-        end
-        
-        if not farming then break end
     end
+    return nil
 end
 
--- Auto Collect function
-local function toggleAutoCollect()
-    collecting = not collecting
-    AutoCollect.Text = collecting and "Auto Collect (ON)" or "Auto Collect (OFF)"
-    
-    while collecting do
-        -- Collect nearby items
-        for _, item in ipairs(workspace:GetChildren()) do
-            if item:IsA("BasePart") and item.Name:lower():find("coin") or item.Name:lower():find("cash") then
-                if (HumanoidRootPart.Position - item.Position).magnitude < 50 then
-                    firetouchinterest(HumanoidRootPart, item, 0) -- Touch start
-                    firetouchinterest(HumanoidRootPart, item, 1) -- Touch end
-                end
-            end
+local function GetOpponentGoal()
+    -- This needs to be customized based on the specific game's goal positions
+    -- For demonstration, we'll just look for parts named "Goal"
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower():find("goal") then
+            return obj.Position
         end
-        wait(0.5)
-        if not collecting then break end
     end
+    return Vector3.new(0, 0, 0) -- Default position if goal not found
 end
 
--- Teleport to Track function
-local function teleportToTrack()
-    local track = workspace:FindFirstChild("Track") or workspace:FindFirstChild("Rail") or workspace:FindFirstChild("TrainTrack")
-    if track then
-        HumanoidRootPart.CFrame = track:FindFirstChildWhichIsA("BasePart").CFrame * CFrame.new(0, 3, 0)
+local Active = false
+local Connection
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Active = not Active
+    
+    if Active then
+        ToggleButton.Text = "ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        StatusLabel.Text = "Status: Active"
+        
+        -- Start auto goal system
+        Connection = RunService.Heartbeat:Connect(function()
+            SafeCall(function()
+                local character = Player.Character
+                if not character then return end
+                
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if not humanoidRootPart then return end
+                
+                local ball = FindSoccerBall()
+                if not ball then return end
+                
+                local goalPosition = GetOpponentGoal()
+                
+                -- Move toward ball
+                if (humanoidRootPart.Position - ball.Position).Magnitude > 5 then
+                    humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position, ball.Position)
+                    -- Simulate movement (this part may need adjustment based on the game)
+                end
+                
+                -- Kick toward goal when close enough
+                if (humanoidRootPart.Position - ball.Position).Magnitude < 10 then
+                    local direction = (goalPosition - ball.Position).Unit
+                    ball.Velocity = direction * 100 -- Adjust force as needed
+                end
+            end)
+        end)
     else
-        LocalPlayer:SetAttribute("LastPosition", HumanoidRootPart.Position)
-        -- Try to find track by teleporting around
-        for x = -500, 500, 100 do
-            for z = -500, 500, 100 do
-                HumanoidRootPart.CFrame = CFrame.new(x, 100, z)
-                wait(0.1)
-                if workspace:FindFirstChild("Track") then
-                    teleportToTrack()
-                    return
-                end
-            end
-        end
-        -- If not found, return to original position
-        if LocalPlayer:GetAttribute("LastPosition") then
-            HumanoidRootPart.CFrame = CFrame.new(LocalPlayer:GetAttribute("LastPosition"))
+        ToggleButton.Text = "OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        StatusLabel.Text = "Status: Inactive"
+        
+        -- Disconnect the auto goal system
+        if Connection then
+            Connection:Disconnect()
+            Connection = nil
         end
     end
-end
-
--- Speed Hack function
-local function toggleSpeedHack()
-    speedHack = not speedHack
-    SpeedHack.Text = speedHack and "Speed Hack (ON)" or "Speed Hack (OFF)"
-    
-    if speedHack then
-        originalWalkSpeed = Humanoid.WalkSpeed
-        Humanoid.WalkSpeed = 50
-    else
-        Humanoid.WalkSpeed = originalWalkSpeed
-    end
-end
-
--- Button connections
-AutoFarm.MouseButton1Click:Connect(toggleAutoFarm)
-AutoCollect.MouseButton1Click:Connect(toggleAutoCollect)
-TeleportToTrack.MouseButton1Click:Connect(teleportToTrack)
-SpeedHack.MouseButton1Click:Connect(toggleSpeedHack)
-Close.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
 end)
 
--- Mobile optimization
-if game:GetService("UserInputService").TouchEnabled then
-    Frame.Size = UDim2.new(0.9, 0, 0.9, 0)
-    Frame.Position = UDim2.new(0.05, 0, 0.05, 0)
+-- Mobile compatibility
+UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
+    if gameProcessed then return end
     
-    for _, button in ipairs(Frame:GetChildren()) do
-        if button:IsA("TextButton") then
-            button.TextSize = 18
+    local touchPosition = touch.Position
+    local framePosition = Frame.AbsolutePosition
+    local frameSize = Frame.AbsoluteSize
+    
+    if touchPosition.X >= framePosition.X and touchPosition.X <= framePosition.X + frameSize.X and
+       touchPosition.Y >= framePosition.Y and touchPosition.Y <= framePosition.Y + frameSize.Y then
+        -- Simulate button click if touching the button area
+        local buttonPosition = ToggleButton.AbsolutePosition
+        local buttonSize = ToggleButton.AbsoluteSize
+        
+        if touchPosition.X >= buttonPosition.X and touchPosition.X <= buttonPosition.X + buttonSize.X and
+           touchPosition.Y >= buttonPosition.Y and touchPosition.Y <= buttonPosition.Y + buttonSize.Y then
+            ToggleButton.MouseButton1Click:Fire()
         end
+    end
+end)
+
+-- Anti-kick measures
+local function RandomActivity()
+    -- Simulate random human-like activity
+    if math.random(1, 100) == 1 then
+        SafeCall(function()
+            local character = Player.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.Jump = math.random() > 0.5
+                end
+            end
+        end)
     end
 end
 
--- Notification
-game.StarterGui:SetCore("SendNotification", {
-    Title = "Dead Rails Mobile",
-    Text = "Script loaded successfully!",
-    Duration = 5
-})
+-- Periodic cleanup to reduce detection
+spawn(function()
+    while wait(math.random(30, 120)) do
+        SafeCall(function()
+            -- Randomly change GUI properties
+            Frame.BackgroundColor3 = Color3.fromRGB(
+                math.random(30, 50),
+                math.random(30, 50),
+                math.random(30, 50)
+            )
+            
+            -- Clear any potential logs
+            if getgenv then
+                getgenv().console = nil
+            end
+        end)
+    end
+end)
+
+-- Final initialization
+StatusLabel.Text = "Status: Ready"
+warn(_ObfuscatedVars.MainModule .. " loaded successfully")
